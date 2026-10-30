@@ -1,0 +1,151 @@
+name: Build and release o1s (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: o1s-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build One UI 8.5 port for SM-G991B
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - name: Checkout project and toolchain submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Verify patch scripts
+        run: bash tests/o1s_patch_smoke.sh
+
+      - name: Free disk space for Samsung firmware extraction
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo docker system prune --all --force || true
+          df -h .
+
+      - name: Free unused runner packages
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Install build prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            attr ccache clang ffmpeg libbrotli-dev libbz2-dev \
+            libgtest-dev libprotobuf-dev libunwind-dev libpcre2-dev \
+            libzstd-dev linux-modules-extra-$(uname -r) lld protobuf-compiler webp \
+            bc git-lfs lz4 rsync p7zip-full python3-venv zip unzip shellcheck
+          sudo modprobe erofs
+          sudo modprobe f2fs
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          df -h .
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Configure Samsung Galaxy S21 target
+        shell: bash
+        run: |
+          set -euo pipefail
+          source ./buildenv.sh o1s
+          {
+            echo "DEBUG=$DEBUG"
+            echo "SRC_DIR=$SRC_DIR"
+            echo "OUT_DIR=$OUT_DIR"
+            echo "ODIN_DIR=$ODIN_DIR"
+            echo "FW_DIR=$FW_DIR"
+            echo "TOOLS_DIR=$TOOLS_DIR"
+            echo "APKTOOL_DIR=$APKTOOL_DIR"
+            echo "WORK_DIR=$WORK_DIR"
+            echo "TMP_DIR=$TMP_DIR"
+          } >> "$GITHUB_ENV"
+          sed -e '/Automatically/d' -e 's/"//g' "$OUT_DIR/config.sh" >> "$GITHUB_ENV"
+          echo "$TOOLS_DIR/bin" >> "$GITHUB_PATH"
+          test "$TARGET_CODENAME" = 'o1s'
+          test "$TARGET_PLATFORM" = 'exynos2100'
+
+      - name: Compile ROM build tools
+        run: ./scripts/build_dependencies.sh
+
+      - name: Download and verify Samsung firmware
+        run: ./scripts/download_fw.sh
+
+      - name: Extract donor and target firmware
+        run: ./scripts/extract_fw.sh
+
+      - name: Build recovery-flashable ROM
+        run: ./scripts/make_rom.sh --build-rom-zip
+
+      - name: Validate flashable package and generate split release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          packages=(out/UN1CA_*_o1s*.zip)
+          if [ "${#packages[@]}" -ne 1 ]; then
+            printf 'Expected exactly one o1s ZIP, found %s\n' "${#packages[@]}"
+            exit 1
+          fi
+          rom="${packages[0]}"
+          zip -T "$rom"
+          unzip -Z -1 "$rom" | grep -qxF 'META-INF/com/google/android/updater-script'
+          unzip -p "$rom" META-INF/com/google/android/updater-script | grep -q 'SM-G991B'
+          mkdir -p out/release
+          file="$(basename "$rom")"
+          # GitHub Release has a 2 GiB limit per asset; always split below that.
+          split -b 1800m -d -a 3 "$rom" "out/release/${file}.part-"
+          sha256sum "$rom" | sed "s|out/||" > out/release/ROM_SHA256.txt
+          (
+            cd out/release
+            sha256sum *.part-* > PARTS_SHA256.txt
+          )
+          {
+            echo 'PRE-RELEASE: NOT YET TESTED ON PHYSICAL SM-G991B'
+            echo
+            echo 'Source: Project Berkyt / sixteen.'
+            echo 'Target: Samsung Galaxy S21 Exynos o1s (SM-G991B).'
+            echo 'Includes Exynos2100 EDEN, Codec2, audio property, and build-cache fixes.'
+            echo 'No GPU, kernel or Vulkan change; TikTok/Instagram flicker is NOT confirmed fixed.'
+            echo 'Installer may flash modem, vbmeta and bootloader. Check firmware/recovery compatibility.'
+            echo
+            echo 'Reassemble the pieces in numeric order and verify ROM_SHA256.txt before flashing.'
+            echo 'Linux/macOS: cat *.part-* > ROM.zip'
+            echo 'Windows (PowerShell): use a binary concatenation tool; do not try to flash the pieces.'
+            echo 'Do not flash unless you can recover the phone via Odin and have a full backup.'
+            echo
+            echo "Build commit: $GITHUB_SHA"
+          } > out/release/RELEASE_NOTES.txt
+          echo "RELEASE_TAG=o1s-rc-$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+
+      - name: Publish release candidate after successful build validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" \
+            out/release/*.part-* \
+            out/release/ROM_SHA256.txt \
+            out/release/PARTS_SHA256.txt \
+            --target "$GITHUB_SHA" \
+            --title "Project Berkyt o1s release candidate $RELEASE_TAG" \
+            --notes-file out/release/RELEASE_NOTES.txt \
+            --prerelease
