@@ -1,36 +1,30 @@
 LOG_STEP_IN "- Fixing EDEN debug logging"
 
-# Remove log.tag.EDEN=INFO from vendor/build.prop
-VENDOR_BUILD_PROP="$WORK_DIR/vendor/build.prop"
-if [ -f "$VENDOR_BUILD_PROP" ]; then
-    LOG "- Removing \"log.tag.EDEN=INFO\" from vendor/build.prop"
-    EVAL "sed -i '/^log\.tag\.EDEN=INFO$/d' \"$VENDOR_BUILD_PROP\""
-fi
-
-# Remove log.tag.EDEN=INFO from system/system/build.prop
-SYSTEM_BUILD_PROP="$WORK_DIR/system/system/build.prop"
-if [ -f "$SYSTEM_BUILD_PROP" ]; then
-    LOG "- Removing \"log.tag.EDEN=INFO\" from system/system/build.prop"
-    EVAL "sed -i '/^log\.tag\.EDEN=INFO$/d' \"$SYSTEM_BUILD_PROP\""
-fi
+# Remove EDEN debug logging from each partition without touching other props.
+for BUILD_PROP in "$WORK_DIR/vendor/build.prop" "$WORK_DIR/system/system/build.prop"; do
+    if [ -f "$BUILD_PROP" ]; then
+        LOG "- Removing EDEN INFO debug logging from $BUILD_PROP"
+        EVAL "sed -i '/^log\.tag\.EDEN=INFO$/d' \"$BUILD_PROP\"" || return 1
+    fi
+done
 
 LOG_STEP_OUT
 
 LOG_STEP_IN "- Patching libvpl.so (64-bit only)"
 
 LIBVPL_64="$WORK_DIR/vendor/lib64/libvpl.so"
-PATCH_SCRIPT="$SRC_DIR/platform/exynos990/patches/eden/patch_libvpl_unload.py"
+# Resolve the patcher from the module directory; Exynos990 was an invalid path.
+PATCH_SCRIPT="$MODPATH/patch_libvpl_unload.py"
 
-if [ -f "$LIBVPL_64" ] && [ -f "$PATCH_SCRIPT" ]; then
-    LOG "- Patching vendor/lib64/libvpl.so (vplUnload → immediate return)"
-    EVAL "python3 \"$PATCH_SCRIPT\" \"$LIBVPL_64\""
-else
-    if [ ! -f "$LIBVPL_64" ]; then
-        LOG "- vendor/lib64/libvpl.so not found, skipping"
-    fi
+if [ -f "$LIBVPL_64" ]; then
     if [ ! -f "$PATCH_SCRIPT" ]; then
-        LOG "- patch_libvpl_unload.py not found, skipping"
+        LOGE "Missing Exynos2100 EDEN patcher: $PATCH_SCRIPT"
+        return 1
     fi
+    LOG "- Patching vendor/lib64/libvpl.so (vplUnload -> immediate return)"
+    EVAL "python3 \"$PATCH_SCRIPT\" \"$LIBVPL_64\"" || return 1
+else
+    LOGW "vendor/lib64/libvpl.so not found; skipping EDEN binary patch"
 fi
 
 LOG_STEP_OUT
