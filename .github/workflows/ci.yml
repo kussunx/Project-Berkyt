@@ -32,7 +32,7 @@ jobs:
             tests/o1s_patch_smoke.sh; do
             bash -n "$file"
           done
-          shellcheck -S error -e SC1090,SC1091 \
+          shellcheck -s bash -S error -e SC1090,SC1091 \
             scripts/make_rom.sh \
             platform/exynos2100/patches/eden/customize.sh \
             platform/exynos2100/patches/omx/customize.sh \
