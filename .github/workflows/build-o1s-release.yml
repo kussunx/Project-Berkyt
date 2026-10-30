@@ -74,7 +74,9 @@ jobs:
       - name: Configure Samsung Galaxy S21 target
         shell: bash
         run: |
-          set -euo pipefail
+          # buildenv.sh is a sourced upstream script and checks unset variables.
+          # Keep errexit/pipefail without nounset for this legacy integration.
+          set -eo pipefail
           source ./buildenv.sh o1s
           {
             echo "DEBUG=$DEBUG"
