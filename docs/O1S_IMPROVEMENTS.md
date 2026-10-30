@@ -23,3 +23,9 @@ Run script checks: `bash tests/o1s_patch_smoke.sh`.
 - Do not flash `source.zip` or `git archive` as if they were recovery packages.
 
 For an on-device test plan: reproduce the flicker using the same video across hardware acceleration paths and collect `logcat` / `dmesg` markers from MediaCodec, HWC, Mali and SurfaceFlinger before changing graphics blobs.
+
+## Build-blocking Bluetooth revision found in CI
+
+The first ROM build after successful firmware download/extraction stopped in `unica/patches/bt-lib-patch/customize.sh`: none of eight known AArch64 signatures matched `libbluetooth_jni.so` from the donor Bluetooth APEX. The patcher now fails closed by default; the CI **prerelease** build explicitly opts into `ALLOW_UNPATCHED_BLUETOOTH=true` to preserve the original APEX bytes instead of installing an unverified replacement. Bluetooth bonding persistence across reboot or airplane mode is **not validated**. The final ZIP must undergo real-device Bluetooth tests before stable release.
+
+Additional build-cache fix: changes to `platform/exynos2100/` and `scripts/` now invalidate cached work directories.
