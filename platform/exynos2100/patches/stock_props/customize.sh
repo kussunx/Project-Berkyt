@@ -14,5 +14,5 @@ sed -i \
     "$SYSTEM_BUILD_PROP" || return 1
 
 # Idempotent on subsequent module invocations.
-printf '\n# Exynos2100 audio and Codec2 compatibility\nro.audio.spatializer_enabled=true\ndebug.codec2.stop_hal_before_surface=1\n' \
+printf '# Exynos2100 audio and Codec2 compatibility\nro.audio.spatializer_enabled=true\ndebug.codec2.stop_hal_before_surface=1\n' \
     >> "$SYSTEM_BUILD_PROP" || return 1
