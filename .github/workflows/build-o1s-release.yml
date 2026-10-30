@@ -140,7 +140,8 @@ jobs:
             echo 'Source: Project Berkyt / sixteen.'
             echo 'Target: Samsung Galaxy S21 Exynos o1s (SM-G991B).'
             echo 'Includes Exynos2100 EDEN, Codec2, audio property, and build-cache fixes.'
-            echo 'No GPU, kernel or Vulkan change; TikTok/Instagram flicker is NOT confirmed fixed.\n            echo 'Bluetooth library patch is allowed to skip unknown revisions. Bluetooth pairing persistence is NOT verified.''
+            echo 'No GPU, kernel or Vulkan change; TikTok/Instagram flicker is NOT confirmed fixed.'
+            echo 'Bluetooth library patch can skip unknown revisions. Bluetooth pairing persistence is NOT verified.'
             echo 'Installer may flash modem, vbmeta and bootloader. Check firmware/recovery compatibility.'
             echo
             echo 'Reassemble the pieces in numeric order and verify ROM_SHA256.txt before flashing.'
