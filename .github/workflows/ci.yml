@@ -29,7 +29,9 @@ jobs:
             platform/exynos2100/patches/eden/customize.sh \
             platform/exynos2100/patches/omx/customize.sh \
             platform/exynos2100/patches/stock_props/customize.sh \
-            tests/o1s_patch_smoke.sh; do
+            tests/o1s_patch_smoke.sh \
+            tests/bluetooth_patcher_smoke.sh \
+            unica/patches/bt-lib-patch/customize.sh; do
             bash -n "$file"
           done
           shellcheck -s bash -S error -e SC1090,SC1091 \
@@ -37,6 +39,10 @@ jobs:
             platform/exynos2100/patches/eden/customize.sh \
             platform/exynos2100/patches/omx/customize.sh \
             platform/exynos2100/patches/stock_props/customize.sh \
-            tests/o1s_patch_smoke.sh
+            tests/o1s_patch_smoke.sh \
+            tests/bluetooth_patcher_smoke.sh \
+            unica/patches/bt-lib-patch/customize.sh
       - name: Run o1s patch smoke tests
-        run: bash tests/o1s_patch_smoke.sh
+        run: |
+          bash tests/o1s_patch_smoke.sh
+          bash tests/bluetooth_patcher_smoke.sh
