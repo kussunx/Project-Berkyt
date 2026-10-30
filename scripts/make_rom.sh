@@ -17,8 +17,18 @@ TARGET_FIRMWARE_PATH="$(cut -d "/" -f 1 -s <<< "$TARGET_FIRMWARE")_$(cut -d "/" 
 
 GET_WORK_DIR_HASH()
 {
-    find "$SRC_DIR/unica" "$SRC_DIR/target/$TARGET_CODENAME" -type f -print0 | \
-        sort -z | xargs -0 sha1sum | sha1sum | cut -d " " -f 1
+    # Include the platform patches and build tools as well as UN1CA and target
+    # configuration: otherwise changing a codec/camera/GPU patch can silently
+    # reuse the old .completed work directory.
+    local INPUTS=(
+        "$SRC_DIR/unica"
+        "$SRC_DIR/platform/$TARGET_PLATFORM"
+        "$SRC_DIR/target/$TARGET_CODENAME"
+        "$SRC_DIR/scripts"
+        "$SRC_DIR/buildenv.sh"
+    )
+    find "${INPUTS[@]}" -type f -print0 |
+        LC_ALL=C sort -z | xargs -0 -r sha1sum | sha1sum | cut -d " " -f 1
 }
 
 PREPARE_SCRIPT()
