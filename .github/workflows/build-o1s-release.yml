@@ -23,7 +23,9 @@ jobs:
           persist-credentials: false
 
       - name: Verify patch scripts
-        run: bash tests/o1s_patch_smoke.sh
+        run: |
+          bash tests/o1s_patch_smoke.sh
+          bash tests/bluetooth_patcher_smoke.sh
 
       - name: Free disk space for Samsung firmware extraction
         run: |
@@ -104,7 +106,10 @@ jobs:
         run: ./scripts/extract_fw.sh
 
       - name: Build recovery-flashable ROM
-        run: ./scripts/make_rom.sh --build-rom-zip
+        run: |
+          # Explicit prerelease mode: preserve unsupported Bluetooth JNI
+          # revisions without guessing machine-code patches.
+          ALLOW_UNPATCHED_BLUETOOTH=true ./scripts/make_rom.sh --build-rom-zip
 
       - name: Validate flashable package and generate split release assets
         shell: bash
@@ -135,7 +140,7 @@ jobs:
             echo 'Source: Project Berkyt / sixteen.'
             echo 'Target: Samsung Galaxy S21 Exynos o1s (SM-G991B).'
             echo 'Includes Exynos2100 EDEN, Codec2, audio property, and build-cache fixes.'
-            echo 'No GPU, kernel or Vulkan change; TikTok/Instagram flicker is NOT confirmed fixed.'
+            echo 'No GPU, kernel or Vulkan change; TikTok/Instagram flicker is NOT confirmed fixed.\n            echo 'Bluetooth library patch is allowed to skip unknown revisions. Bluetooth pairing persistence is NOT verified.''
             echo 'Installer may flash modem, vbmeta and bootloader. Check firmware/recovery compatibility.'
             echo
             echo 'Reassemble the pieces in numeric order and verify ROM_SHA256.txt before flashing.'
