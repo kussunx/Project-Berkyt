@@ -47,10 +47,19 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
             attr ccache clang ffmpeg libbrotli-dev libbz2-dev \
             libgtest-dev libprotobuf-dev libunwind-dev libpcre2-dev \
-            libzstd-dev linux-modules-extra-$(uname -r) lld protobuf-compiler webp \
+            libzstd-dev lld protobuf-compiler webp \
             bc git-lfs lz4 rsync p7zip-full python3-venv zip unzip shellcheck
-          sudo modprobe erofs
-          sudo modprobe f2fs
+          # Azure runners may not publish a linux-modules-extra package for
+          # their exact kernel. Prefer built-in support, then modprobe.
+          for fs in erofs f2fs; do
+            if ! grep -qw "$fs" /proc/filesystems; then
+              sudo modprobe "$fs" || true
+            fi
+            if ! grep -qw "$fs" /proc/filesystems; then
+              echo "::error::Required filesystem $fs is unavailable on this runner"
+              exit 1
+            fi
+          done
           git config --global user.name 'github-actions[bot]'
           git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
           df -h .
